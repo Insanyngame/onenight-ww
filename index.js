@@ -15,8 +15,27 @@ app.set('views', './views');
 // const __dirname = dirname(fileURLToPath(import.meta.url));
 
 var activeRooms = [];
-const roomRegex = /^[a-zA-Z0-9]{7}$/
+var rooms = {};
+const roomRegex = /^[A-Z0-9]{5}$/
 const userRegex = /^[a-zA-Z0-9_ ]+$/
+
+function randomString(stringSize) {
+  let str = "";
+  for(let i = 0; i < stringSize; i++) {
+    let random = Math.floor(Math.random()*(26+10));
+    let char;
+    if(random < 10) char = 48+random;
+    else if(random < 36) char = 65+(random-10);
+    str += String.fromCharCode(char);
+  }
+
+  return str;
+}
+
+function validUsername(username) {
+  if(!username || !userRegex.test(username)) return false;
+  return true;
+}
 
 function validRoomCode(roomCode) {
   if(!roomCode || !roomRegex.test(roomCode)) return false;
@@ -28,10 +47,14 @@ function roomExists(roomCode) {
   return activeRooms.includes(roomCode);
 }
 
-function createRoom(roomCode) {
-  if(!validRoomCode(roomCode) || roomExists(roomCode)) return false;
+function createRoom() {
+  let roomCode = randomString(5);
+  while(roomExists(roomCode)) {
+    roomCode = randomString(5);
+  }
   activeRooms.push(roomCode);
-  return true;
+  rooms[roomCode] = [];
+  return roomCode;
 }
 
 app.get('/', (req, res) => {
@@ -50,7 +73,7 @@ app.get('/create/:roomCode', (req, res) => {
   }
 });
 
-app.get('/join/:roomCode', (req, res) => {
+app.get('/room/:roomCode', (req, res) => {
   console.log(req.params);
   let roomCode = req.params.roomCode;
   if(!roomExists(roomCode)) res.redirect('/?error=roomnotfound');
@@ -65,10 +88,30 @@ io.on('connection', (socket) => {
 });
 
 io.on('connection', (socket) => {
+  socket.on('create room', (msg) => {
+    let roomCode = createRoom();
+    let username = msg.username;
 
+    console.log('criando sala '+roomCode);
+    socket.emit('join room', {username: username, roomCode: roomCode});
+  });
  
   socket.on('enter room', (msg) => {
-    socket.emit("Entered room");
+    if(!validUsername(msg.username) || !roomExists(msg.roomCode)) {
+      socket.emit("redirect", "/");
+      return;
+    }
+    if(rooms[msg.roomCode].includes(msg.username)) {
+      socket.emit("redirect", "/?error=usernameexists");
+      return;
+    }
+
+    socket.join(msg.roomCode);
+    io.to(msg.roomCode).emit("joined room", msg.username);
+    rooms[msg.roomCode].push(msg.username);
+
+    socket.emit("success enter");
+    console.log("entrouu");
   })
 
   socket.on('chat message', (msg) => {

@@ -7,24 +7,30 @@
 </head>
 <body>
     <%= roomCode %>
-
+    <p id="loggedinas"></p>
     <script src="/socket.io/socket.io.js"></script>
     <script>
+    const roomRegex = /^[A-Z0-9]{5}$/
+    const userRegex = /^[a-zA-Z0-9_ ]+$/
+
+    const storedUsername = sessionStorage.getItem('username');
+
+    document.getElementById("loggedinas").textContent = `Welcome, ${storedUsername}!`;
+
     const socket = io();
 
-    const form = document.getElementById('form');
-    const input = document.getElementById('input');
-    const messages = document.getElementById('messages');
+    socket.emit('enter room', {username: storedUsername, roomCode: "<%= roomCode %>"});
+    
+    socket.on('success enter', (msg) => {
 
-    socket.emit('enter room', {username: "A"});
+    })
+    socket.on('joined room', (username) => {
+        alert(`${username} joined the room`);
+    })
 
-    socket.on('chat message', (msg) => {
-        console.log("criando mensagem");
-        const item = document.createElement('li');
-        item.textContent = msg;
-        messages.appendChild(item);
-        window.scrollTo(0, document.body.scrollHeight);
-    });
+    socket.on('redirect', (msg) => {
+        window.location.href = msg;
+    })
     </script>
 </body>
 </html>
